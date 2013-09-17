@@ -2,9 +2,9 @@ package au.com.mineauz.clr;
 
 import java.util.HashMap;
 import java.util.HashSet;
-
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
+import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
@@ -16,20 +16,71 @@ import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.util.BlockVector;
 
+import com.google.common.collect.TreeMultimap;
+
+import au.com.mineauz.clr.ChunkData.SubChunk;
+
 public class PlayerChunkUpdater implements Listener
 {
-	private HashMap<Player, HashSet<ChunkData>> mActiveSets;
-	private HashMap<Player, Chunk> mLastChunk;
+	public static int maxTiles = 100;
+	
+	private HashMap<Player, HashSet<ChunkData>> mActiveChunks;
+	private HashMap<Player, HashSet<SubChunk>> mActiveSets;
+	private HashMap<Player, BlockVector> mLastChunk;
 	
 	public PlayerChunkUpdater()
 	{
-		mActiveSets = new HashMap<Player, HashSet<ChunkData>>();
-		mLastChunk = new HashMap<Player, Chunk>();
+		mActiveChunks = new HashMap<Player, HashSet<ChunkData>>();
+		mActiveSets = new HashMap<Player, HashSet<SubChunk>>();
+		mLastChunk = new HashMap<Player, BlockVector>();
 	}
 	
-	private void updateTiles(Player player, ChunkData chunk, boolean show)
+	private void getClosestChunks(Player player, HashSet<SubChunk> chunks, HashSet<ChunkData> visible)
 	{
-		for(BlockVector loc : chunk.interestingBlocks)
+		chunks.clear();
+		visible.clear();
+		
+		int count = 0;
+		Chunk current = player.getLocation().getChunk();
+
+		Location loc = player.getLocation();
+		
+		World world = player.getWorld();
+		TreeMultimap<Integer, SubChunk> ordered = TreeMultimap.create();
+		
+		for(int x = current.getX() - Bukkit.getViewDistance() / 2; x <= current.getX() + Bukkit.getViewDistance() / 2; ++x)
+		{
+			for(int z = current.getZ() - Bukkit.getViewDistance() / 2; z <= current.getZ() + Bukkit.getViewDistance() / 2; ++z)
+			{
+				if(world.isChunkInUse(x, z))
+				{
+					ChunkData chunk = CLRPlugin.getInstance().getChunkData(world.getChunkAt(x, z));
+					visible.add(chunk);
+					
+					for(int y = 0; y < world.getMaxHeight() >> 4; ++y)
+					{
+						int dist = (int)(Math.pow(loc.getX() - (x * 16 + 8), 2) + Math.pow(loc.getY() - (y * 16 + 8),2) + Math.pow(loc.getZ() - (z * 16 + 8),2));
+						ordered.put(dist, chunk.getSubChunk(y));
+					}
+				}
+			}
+		}
+		
+		
+		// Now get only the nearest chunks until the count is met
+		for(SubChunk chunk : ordered.values())
+		{
+			chunks.add(chunk);
+			count += chunk.getTileCount();
+			
+			if(count >= maxTiles)
+				break;
+		}
+	}
+	
+	private void updateTiles(Player player, SubChunk chunk, boolean show)
+	{
+		for(BlockVector loc : chunk.getTileEntities())
 		{
 			if(show)
 			{
@@ -43,74 +94,45 @@ public class PlayerChunkUpdater implements Listener
 		}
 	}
 	
-	private boolean getShowStatus(ChunkData chunk, Chunk playersChunk)
-	{
-		return (Math.abs(chunk.chunk.getX() - playersChunk.getX()) + Math.abs(chunk.chunk.getZ() - playersChunk.getZ()) < 2);
-	}
-	
 	private void updateActiveChunkSet(Player player)
 	{
-		Chunk last = null;
+		BlockVector last = null;
+		Location playerLoc = player.getLocation();
+		BlockVector current = new BlockVector(playerLoc.getBlockX() >> 4, playerLoc.getBlockY() >> 4, playerLoc.getBlockZ() >> 4);
+		
 		if(!mLastChunk.containsKey(player))
-			mActiveSets.put(player, new HashSet<ChunkData>());
+		{
+			mActiveSets.put(player, new HashSet<SubChunk>());
+			mActiveChunks.put(player, new HashSet<ChunkData>());
+		}
 		else
 		{
 			last = mLastChunk.get(player);
-			if(last.equals(player.getLocation().getChunk()))
+			if(last.equals(current))
 				return;
 		}
 
-		Chunk current = player.getLocation().getChunk();
 		mLastChunk.put(player, current);
 		
-		HashSet<ChunkData> currentSet = mActiveSets.get(player);
-		HashSet<ChunkData> old = new HashSet<ChunkData>(currentSet);
-		HashSet<ChunkData> toShow = new HashSet<ChunkData>();
-		HashSet<ChunkData> toHide = new HashSet<ChunkData>();
+		HashSet<SubChunk> currentSet = mActiveSets.get(player);
+		HashSet<SubChunk> old = new HashSet<SubChunk>(currentSet);
 		
-		currentSet.clear();
+		HashSet<ChunkData> visibleChunks = mActiveChunks.get(player);
+		HashSet<ChunkData> oldChunks = new HashSet<ChunkData>(visibleChunks);
 		
-		World world = player.getWorld();
+		getClosestChunks(player, currentSet, visibleChunks);
 		
-		for(int x = current.getX() - Bukkit.getViewDistance() / 2; x <= current.getX() + Bukkit.getViewDistance() / 2; ++x)
+		for(ChunkData loaded : Misc.uniqueToB(oldChunks, visibleChunks))
 		{
-			for(int z = current.getZ() - Bukkit.getViewDistance() / 2; z <= current.getZ() + Bukkit.getViewDistance() / 2; ++z)
-			{
-				if(world.isChunkInUse(x, z))
-				{
-					ChunkData chunk = CLRPlugin.getInstance().getChunkData(world.getChunkAt(x, z));
-					
-					if(chunk == null)
-						continue;
-					
-					if(!old.contains(chunk))
-					{
-						if(getShowStatus(chunk, current))
-							toShow.add(chunk);
-						else
-							toHide.add(chunk);
-					}
-					else
-					{
-						boolean showNew = getShowStatus(chunk, current);
-						boolean showOld = (last != null ? getShowStatus(chunk, last) : false);
-						
-						if(showNew && !showOld)
-							toShow.add(chunk);
-						else if(showOld && !showNew)
-							toHide.add(chunk);
-					}
-					
-					currentSet.add(chunk);
-				}
-			}
+			for(int y = 0; y < player.getWorld().getMaxHeight() >> 4; ++y)
+				updateTiles(player, loaded.getSubChunk(y), false);
 		}
 		
-		for(ChunkData chunk : toShow)
-			updateTiles(player, chunk, true);
+		for(SubChunk discarded : Misc.uniqueToB(currentSet, old))
+			updateTiles(player, discarded, false);
 		
-		for(ChunkData chunk : toHide)
-			updateTiles(player, chunk, false);
+		for(SubChunk gained : Misc.uniqueToB(old, currentSet))
+			updateTiles(player, gained, true);
 	}
 	
 	@EventHandler(priority=EventPriority.MONITOR, ignoreCancelled = true)

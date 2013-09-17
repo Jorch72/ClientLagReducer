@@ -1,5 +1,8 @@
 package au.com.mineauz.clr;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import net.minecraft.server.v1_6_R2.Packet;
 import net.minecraft.server.v1_6_R2.Packet130UpdateSign;
 
@@ -24,5 +27,13 @@ public class Misc
 			sendPacket(player, packet);
 		}
 		
+	}
+	
+	public static <T> Set<T> uniqueToB(Set<T> a, Set<T> b)
+	{
+		HashSet<T> clone = new HashSet<T>(b);
+		clone.removeAll(a);
+		
+		return clone;
 	}
 }

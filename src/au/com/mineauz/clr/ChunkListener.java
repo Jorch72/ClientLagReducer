@@ -13,7 +13,6 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.event.world.ChunkUnloadEvent;
-import org.bukkit.util.BlockVector;
 
 public class ChunkListener implements Listener
 {
@@ -28,7 +27,6 @@ public class ChunkListener implements Listener
 	private void onChunkLoad(ChunkLoadEvent event)
 	{
 		ChunkData chunk = new ChunkData(event.getChunk());
-		scanChunk(chunk);
 		mLoadedChunks.put(chunk.chunk, chunk);
 	}
 	
@@ -48,7 +46,7 @@ public class ChunkListener implements Listener
 		if(chunk == null)
 			return;
 		
-		chunk.interestingBlocks.add(new BlockVector(event.getBlock().getX(), event.getBlock().getY(), event.getBlock().getZ()));
+		chunk.addTileEntity(event.getBlock());
 	}
 	
 	@EventHandler(priority=EventPriority.MONITOR, ignoreCancelled=true)
@@ -61,7 +59,7 @@ public class ChunkListener implements Listener
 		if(chunk == null)
 			return;
 		
-		chunk.interestingBlocks.remove(new BlockVector(event.getBlock().getX(), event.getBlock().getY(), event.getBlock().getZ()));
+		chunk.removeTileEntity(event.getBlock());
 	}
 	
 	public void updateFromLoadedChunks()
@@ -73,16 +71,9 @@ public class ChunkListener implements Listener
 			for(Chunk chunk : world.getLoadedChunks())
 			{
 				ChunkData chunkdata = new ChunkData(chunk);
-				scanChunk(chunkdata);
 				mLoadedChunks.put(chunkdata.chunk, chunkdata);
 			}
 		}
-	}
-	
-	private void scanChunk(ChunkData chunk)
-	{
-		for(BlockState state : chunk.chunk.getTileEntities())
-			chunk.interestingBlocks.add(new BlockVector(state.getX(), state.getY(), state.getZ()));
 	}
 	
 	public ChunkData getChunk(Chunk chunk)

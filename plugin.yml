@@ -1,0 +1,8 @@
+name: ClientLagReducer
+description: A plugin aimed to reduce client lag by limiting the amount of lag producing blocks sent to the client
+
+author: Schmoller
+
+version: 1.0.0
+
+main: au.com.mineauz.clr.CLRPlugin

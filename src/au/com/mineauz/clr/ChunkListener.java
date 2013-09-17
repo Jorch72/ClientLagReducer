@@ -2,7 +2,9 @@ package au.com.mineauz.clr;
 
 import java.util.HashMap;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
+import org.bukkit.World;
 import org.bukkit.block.BlockState;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -62,11 +64,30 @@ public class ChunkListener implements Listener
 		chunk.interestingBlocks.remove(new BlockVector(event.getBlock().getX(), event.getBlock().getY(), event.getBlock().getZ()));
 	}
 	
+	public void updateFromLoadedChunks()
+	{
+		mLoadedChunks.clear();
+		
+		for(World world : Bukkit.getWorlds())
+		{
+			for(Chunk chunk : world.getLoadedChunks())
+			{
+				ChunkData chunkdata = new ChunkData(chunk);
+				scanChunk(chunkdata);
+				mLoadedChunks.put(chunkdata.chunk, chunkdata);
+			}
+		}
+	}
+	
 	private void scanChunk(ChunkData chunk)
 	{
 		for(BlockState state : chunk.chunk.getTileEntities())
 			chunk.interestingBlocks.add(new BlockVector(state.getX(), state.getY(), state.getZ()));
 	}
 	
+	public ChunkData getChunk(Chunk chunk)
+	{
+		return mLoadedChunks.get(chunk);
+	}
 	
 }

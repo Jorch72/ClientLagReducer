@@ -34,8 +34,7 @@ public class PlayerChunkUpdater implements Listener
 			if(show)
 			{
 				Block actual = player.getWorld().getBlockAt(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
-				player.sendBlockChange(loc.toLocation(player.getWorld()), actual.getTypeId(), actual.getData());
-				// TODO: Tile data
+				Misc.sendBlockStateUpdate(player, actual.getState());
 			}
 			else
 			{
@@ -80,6 +79,9 @@ public class PlayerChunkUpdater implements Listener
 				if(world.isChunkInUse(x, z))
 				{
 					ChunkData chunk = CLRPlugin.getInstance().getChunkData(world.getChunkAt(x, z));
+					
+					if(chunk == null)
+						continue;
 					
 					if(!old.contains(chunk))
 					{

@@ -12,7 +12,9 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerKickEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.util.BlockVector;
 
@@ -28,6 +30,9 @@ public class PlayerChunkUpdater implements Listener
 	private HashMap<Player, HashSet<SubChunk>> mActiveSets;
 	private HashMap<Player, BlockVector> mLastChunk;
 	
+	private int showCount = 0;
+	private int hideCount = 0;
+	
 	public PlayerChunkUpdater()
 	{
 		mActiveChunks = new HashMap<Player, HashSet<ChunkData>>();
@@ -35,6 +40,15 @@ public class PlayerChunkUpdater implements Listener
 		mLastChunk = new HashMap<Player, BlockVector>();
 	}
 	
+	public boolean isActive(ChunkData chunk, Player player)
+	{
+		HashSet<ChunkData> chunks = mActiveChunks.get(player);
+		
+		if(chunks == null)
+			return false;
+		
+		return chunks.contains(chunk);
+	}
 	private void getClosestChunks(Player player, HashSet<SubChunk> chunks, HashSet<ChunkData> visible)
 	{
 		chunks.clear();
@@ -84,11 +98,13 @@ public class PlayerChunkUpdater implements Listener
 		{
 			if(show)
 			{
+				showCount++;
 				Block actual = player.getWorld().getBlockAt(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
 				Misc.sendBlockStateUpdate(player, actual.getState());
 			}
 			else
 			{
+				hideCount++;
 				player.sendBlockChange(loc.toLocation(player.getWorld()), 0, (byte)0);
 			}
 		}
@@ -122,6 +138,7 @@ public class PlayerChunkUpdater implements Listener
 		
 		getClosestChunks(player, currentSet, visibleChunks);
 		
+		showCount = hideCount = 0;
 		for(ChunkData loaded : Misc.uniqueToB(oldChunks, visibleChunks))
 		{
 			for(int y = 0; y < player.getWorld().getMaxHeight() >> 4; ++y)
@@ -133,6 +150,8 @@ public class PlayerChunkUpdater implements Listener
 		
 		for(SubChunk gained : Misc.uniqueToB(old, currentSet))
 			updateTiles(player, gained, true);
+		
+		System.out.println("Shown: " + showCount + " Hidden: " + hideCount);
 	}
 	
 	@EventHandler(priority=EventPriority.MONITOR, ignoreCancelled = true)
@@ -153,6 +172,35 @@ public class PlayerChunkUpdater implements Listener
 		updateActiveChunkSet(event.getPlayer());
 	}
 	
+	@EventHandler(priority=EventPriority.MONITOR, ignoreCancelled = true)
+	private void onPlayerQuit(PlayerQuitEvent event)
+	{
+		mActiveSets.remove(event.getPlayer());
+		mActiveChunks.remove(event.getPlayer());
+		mLastChunk.remove(event.getPlayer());
+	}
 	
+	@EventHandler(priority=EventPriority.MONITOR, ignoreCancelled = true)
+	private void onPlayerQuit(PlayerKickEvent event)
+	{
+		mActiveSets.remove(event.getPlayer());
+		mActiveChunks.remove(event.getPlayer());
+		mLastChunk.remove(event.getPlayer());
+	}
+	
+	public void onPlayerChunkLoad(Chunk chunk, Player player)
+	{
+		
+	}
+
+	public void onPlayerChunkUnload(Chunk chunk, Player player)
+	{
+		
+	}
+	
+	public void onChunkUpdate(Chunk chunk)
+	{
+		
+	}
 }
 

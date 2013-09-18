@@ -6,3 +6,5 @@ author: Schmoller
 version: 1.0.0
 
 main: au.com.mineauz.clr.CLRPlugin
+
+depend: [BKCommonLib]

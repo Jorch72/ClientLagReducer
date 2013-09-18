@@ -2,7 +2,11 @@ package au.com.mineauz.clr;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import com.bergerkiller.bukkit.common.protocol.PacketType;
+import com.bergerkiller.bukkit.common.utils.PacketUtil;
 
 public class CLRPlugin extends JavaPlugin
 {
@@ -22,6 +26,8 @@ public class CLRPlugin extends JavaPlugin
 		Bukkit.getPluginManager().registerEvents(mPlayers, this);
 		
 		mChunks.updateFromLoadedChunks();
+		
+		PacketUtil.addPacketListener(this, new TerrainPacketMonitor(mPlayers), PacketType.BLOCK_CHANGE, PacketType.MAP_CHUNK, PacketType.MAP_CHUNK_BULK, PacketType.MULTI_BLOCK_CHANGE);
 	};
 	public static CLRPlugin getInstance()
 	{
@@ -31,5 +37,10 @@ public class CLRPlugin extends JavaPlugin
 	public ChunkData getChunkData(Chunk chunk)
 	{
 		return mChunks.getChunk(chunk);
+	}
+	
+	public boolean isActiveChunk(ChunkData chunk, Player player)
+	{
+		return mPlayers.isActive(chunk, player);
 	}
 }

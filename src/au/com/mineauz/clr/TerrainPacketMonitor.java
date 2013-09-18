@@ -1,12 +1,14 @@
 package au.com.mineauz.clr;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.zip.Deflater;
 
 import org.bukkit.Chunk;
+import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.block.BlockState;
 import org.bukkit.entity.Player;
-
 import com.bergerkiller.bukkit.common.events.PacketReceiveEvent;
 import com.bergerkiller.bukkit.common.events.PacketSendEvent;
 import com.bergerkiller.bukkit.common.protocol.CommonPacket;
@@ -17,9 +19,13 @@ public class TerrainPacketMonitor implements PacketListener
 {
 	private PlayerChunkUpdater mChunkUpdater;
 	
+	private HashMap<Player, AgeingMap<Location, Material>> mBannedUpdates;
+	private AgeingMap<Location, Material> mActive;
+	
 	public TerrainPacketMonitor(PlayerChunkUpdater updater)
 	{
 		mChunkUpdater = updater;
+		mBannedUpdates = new HashMap<Player, AgeingMap<Location,Material>>();
 	}
 	
 	@Override
@@ -29,17 +35,23 @@ public class TerrainPacketMonitor implements PacketListener
 	private void removeTileEntities(RawChunk raw, Chunk chunk)
 	{
 		for(BlockState tile : chunk.getTileEntities())
+		{
 			raw.setBlockId(tile.getX() & 0xF, tile.getY(), tile.getZ() & 0xF, 0);
+			mActive.put(tile.getLocation(), tile.getType());
+		}
 	}
-	
+
 	@Override
 	public void onPacketSend( PacketSendEvent event )
 	{
-		onMonitorPacketSend(event.getPacket(), event.getPlayer());
-	}
-	
-	public void onMonitorPacketSend( CommonPacket packet, Player player )
-	{
+		CommonPacket packet = event.getPacket();
+		Player player = event.getPlayer();
+		
+		if(!mBannedUpdates.containsKey(player))
+			mBannedUpdates.put(player, new AgeingMap<Location, Material>(100));
+		
+		mActive = mBannedUpdates.get(player);
+		
 		switch(packet.getType())
 		{
 		case MAP_CHUNK:
@@ -65,7 +77,7 @@ public class TerrainPacketMonitor implements PacketListener
 			byte[][] buffers = packet.read(PacketFields.MAP_CHUNK_BULK.inflatedBuffers);
 			int[] x = packet.read(PacketFields.MAP_CHUNK_BULK.bulk_x);
 			int[] z = packet.read(PacketFields.MAP_CHUNK_BULK.bulk_z);
-			//PacketFields.MAP_CHUNK_BULK.bulk_chunkDataBitMap
+
 			for(int i = 0; i < x.length; ++i)
 			{
 				Chunk chunk = player.getWorld().getChunkAt(x[i],z[i]);
@@ -77,16 +89,29 @@ public class TerrainPacketMonitor implements PacketListener
 			for(int i = 0; i < x.length; ++i)
 			{
 				if(buildBuffer.length < start + buffers[i].length)
-				{
 					buildBuffer = Arrays.copyOf(buildBuffer, start + buffers[i].length);
-				}
 				
 				System.arraycopy(buffers[i], 0, buildBuffer, start, buffers[i].length);
 				start += buffers[i].length;
 			}
 			packet.write(PacketFields.MAP_CHUNK_BULK.buildBuffer, buildBuffer);
 			
-			//Arrays.fill(packet.read(PacketFields.MAP_CHUNK_BULK.deflatedData), (byte)0);
+			break;
+		}
+		case UPDATE_SIGN:
+		{
+			Location loc = new Location(player.getWorld(), packet.read(PacketFields.UPDATE_SIGN.x), packet.read(PacketFields.UPDATE_SIGN.y), packet.read(PacketFields.UPDATE_SIGN.z));
+			if(mActive.containsKey(loc))
+				event.setCancelled(true);
+			
+			break;
+		}
+		case TILE_ENTITY_DATA:
+		{
+			Location loc = new Location(player.getWorld(), packet.read(PacketFields.TILE_ENTITY_DATA.x), packet.read(PacketFields.TILE_ENTITY_DATA.y), packet.read(PacketFields.TILE_ENTITY_DATA.z));
+			if(mActive.containsKey(loc))
+				event.setCancelled(true);
+			
 			break;
 		}
 		case BLOCK_CHANGE:

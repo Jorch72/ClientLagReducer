@@ -27,7 +27,7 @@ public class CLRPlugin extends JavaPlugin
 		
 		mChunks.updateFromLoadedChunks();
 		
-		PacketUtil.addPacketListener(this, new TerrainPacketMonitor(mPlayers), PacketType.BLOCK_CHANGE, PacketType.MAP_CHUNK, PacketType.MAP_CHUNK_BULK, PacketType.MULTI_BLOCK_CHANGE);
+		PacketUtil.addPacketListener(this, new TerrainPacketMonitor(mPlayers), PacketType.BLOCK_CHANGE, PacketType.MAP_CHUNK, PacketType.MAP_CHUNK_BULK, PacketType.MULTI_BLOCK_CHANGE, PacketType.UPDATE_SIGN, PacketType.TILE_ENTITY_DATA);
 	};
 	public static CLRPlugin getInstance()
 	{

@@ -36,11 +36,18 @@ public class Misc
 		
 		PacketUtil.sendPacket(player, packet);
 	}
-	public static void sendBlockStateUpdate(Player player, BlockState state)
+	
+	public static void setSignState(Player player, BlockVector location, String[] lines)
+	{
+		Packet130UpdateSign packet = new Packet130UpdateSign(location.getBlockX(), location.getBlockY(), location.getBlockZ(), lines);
+		sendPacket(player, packet);
+	}
+	
+	public static void sendBlockStateUpdate(Player player, BlockState state, boolean signs)
 	{
 		player.sendBlockChange(state.getLocation(), state.getTypeId(), state.getRawData());
 		
-		if (state instanceof Sign)
+		if (state instanceof Sign && signs)
 		{
 			Packet130UpdateSign packet = new Packet130UpdateSign(state.getX(), state.getY(), state.getZ(), ((Sign)state).getLines());
 			sendPacket(player, packet);

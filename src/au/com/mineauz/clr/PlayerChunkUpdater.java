@@ -6,6 +6,7 @@ import java.util.Set;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
@@ -25,10 +26,12 @@ import au.com.mineauz.clr.ChunkData.SubChunk;
 public class PlayerChunkUpdater implements Listener
 {
 	public static int maxRange = 20;
+	public static int signRange = 10;
 	
 	private HashMap<Player, HashSet<ChunkData>> mActiveChunks;
 	private HashMap<Player, HashSet<SubChunk>> mActiveSets;
 	private HashMap<Player, Set<BlockVector>> mShownTiles;
+	private HashMap<Player, Set<BlockVector>> mShownSigns;
 	private HashMap<Player, BlockVector> mLastChunk;
 	
 	public PlayerChunkUpdater()
@@ -37,6 +40,7 @@ public class PlayerChunkUpdater implements Listener
 		mActiveSets = new HashMap<Player, HashSet<SubChunk>>();
 		mLastChunk = new HashMap<Player, BlockVector>();
 		mShownTiles = new HashMap<Player, Set<BlockVector>>();
+		mShownSigns = new HashMap<Player, Set<BlockVector>>();
 	}
 	
 	public boolean isActive(ChunkData chunk, Player player)
@@ -88,7 +92,7 @@ public class PlayerChunkUpdater implements Listener
 			if(show)
 			{
 				Block actual = player.getWorld().getBlockAt(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
-				Misc.sendBlockStateUpdate(player, actual.getState());
+				Misc.sendBlockStateUpdate(player, actual.getState(), true);
 			}
 			else
 			{
@@ -143,17 +147,24 @@ public class PlayerChunkUpdater implements Listener
 			return;
 		
 		Set<BlockVector> shownTiles = mShownTiles.get(player);
+		Set<BlockVector> shownSigns = mShownSigns.get(player);
 		if(shownTiles == null)
 		{
 			shownTiles = new HashSet<BlockVector>();
+			shownSigns = new HashSet<BlockVector>();
 			mShownTiles.put(player, shownTiles);
+			mShownSigns.put(player, shownSigns);
 		}
 		
 		Set<BlockVector> old = new HashSet<BlockVector>(shownTiles);
+		Set<BlockVector> oldSigns = new HashSet<BlockVector>(shownSigns);
 		
 		shownTiles.clear();	
+		shownSigns.clear();
 		
 		int dist = maxRange * maxRange;
+		int distSign = signRange * signRange;
+		
 		Vector pos = player.getLocation().toVector();
 		
 		for(SubChunk chunk : nearestChunks)
@@ -161,7 +172,12 @@ public class PlayerChunkUpdater implements Listener
 			for(BlockVector block : chunk.getTileEntities())
 			{
 				if(block.distanceSquared(pos) < dist)
+				{
 					shownTiles.add(block);
+					Block b = player.getWorld().getBlockAt(block.getBlockX(), block.getBlockY(), block.getBlockZ());
+					if((b.getType() == Material.WALL_SIGN || b.getType() == Material.SIGN_POST) && block.distanceSquared(pos) < distSign)
+						shownSigns.add(block);
+				}
 			}
 		}
 		
@@ -169,7 +185,13 @@ public class PlayerChunkUpdater implements Listener
 			Misc.sendBlockChange(player, hidden, 0, 0);
 		
 		for(BlockVector shown : Misc.uniqueToB(old, shownTiles))
-			Misc.sendBlockStateUpdate(player, player.getWorld().getBlockAt(shown.getBlockX(), shown.getBlockY(), shown.getBlockZ()).getState());
+			Misc.sendBlockStateUpdate(player, player.getWorld().getBlockAt(shown.getBlockX(), shown.getBlockY(), shown.getBlockZ()).getState(), false);
+		
+		for(BlockVector hidden : Misc.uniqueToB(shownSigns, oldSigns))
+			Misc.setSignState(player, hidden, new String[] {"","","",""});
+		
+		for(BlockVector shown : Misc.uniqueToB(oldSigns, shownSigns))
+			Misc.sendBlockStateUpdate(player, player.getWorld().getBlockAt(shown.getBlockX(), shown.getBlockY(), shown.getBlockZ()).getState(), true);
 	}
 	
 	@EventHandler(priority=EventPriority.MONITOR, ignoreCancelled = true)

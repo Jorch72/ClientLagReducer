@@ -2,7 +2,6 @@ package au.com.mineauz.clr;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
-import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import com.bergerkiller.bukkit.common.protocol.PacketType;
@@ -39,8 +38,4 @@ public class CLRPlugin extends JavaPlugin
 		return mChunks.getChunk(chunk);
 	}
 	
-	public boolean isActiveChunk(ChunkData chunk, Player player)
-	{
-		return mPlayers.isActive(chunk, player);
-	}
 }
